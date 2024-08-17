@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Request, Response
+# app.py
+from aiohttp import web
 from botbuilder.core import BotFrameworkAdapterSettings, BotFrameworkAdapter
 from botbuilder.schema import Activity
 from teams_bot import TeamsRAGBot
@@ -10,6 +11,7 @@ import os
 load_dotenv()
 
 # Create adapter.
+# Note: When testing locally, you can use empty strings for app ID and password.
 settings = BotFrameworkAdapterSettings(os.getenv("MicrosoftAppId", ""), os.getenv("MicrosoftAppPassword", ""))
 adapter = BotFrameworkAdapter(settings)
 
@@ -26,28 +28,32 @@ adapter.on_turn_error = on_error
 # Create bot
 bot = TeamsRAGBot()
 
-# Configure FastAPI app
-app = FastAPI()
-
-@app.post("/api/messages")
-async def messages(request: Request):
-    if request.headers.get("Content-Type") == "application/json":
-        body = await request.json()
+# Listen for incoming requests on /api/messages
+async def messages(req: web.Request) -> web.Response:
+    # Main bot message handler.
+    if "application/json" in req.headers["Content-Type"]:
+        body = await req.json()
     else:
-        return Response(status_code=415)
+        return web.Response(status=415)
 
     activity = Activity().deserialize(body)
-    auth_header = request.headers.get("Authorization", "")
+    auth_header = req.headers["Authorization"] if "Authorization" in req.headers else ""
 
     try:
         response = await adapter.process_activity(activity, auth_header, bot.on_turn)
         if response:
-            return Response(content=response.body, status_code=response.status)
-        return Response(status_code=201)
+            return web.json_response(data=response.body, status=response.status)
+        return web.Response(status=201)
     except Exception as e:
         print(f"Error processing activity: {e}")
-        return Response(status_code=500)
+        return web.Response(status=500)
+
+# Configure web app
+app = web.Application()
+app.router.add_post("/api/messages", messages)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    try:
+        web.run_app(app, host="localhost", port=3978)
+    except Exception as error:
+        raise error
