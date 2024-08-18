@@ -8,20 +8,24 @@ import traceback
 import os
 
 # Initialize the Managed Identity credential
-credential = ManagedIdentityCredential(client_id=os.getenv("AZURE_CLIENT_ID"))
+credential = ManagedIdentityCredential(client_id=os.getenv("MicrosoftAppId"))
 
-# Create adapter using Managed Identity
+# Create adapter settings
 settings = BotFrameworkAdapterSettings(
-    credential=credential,
-    tenant_id=os.getenv("AZURE_TENANT_ID"),
+    app_id=os.getenv("MicrosoftAppId"),
+    app_password=None  # No password needed for managed identity
 )
+
+# Create adapter
 adapter = BotFrameworkAdapter(settings)
+
+# Configure adapter to use managed identity for token acquisition
+adapter.credentials = credential
 
 # Catch-all for errors.
 async def on_error(context, error):
     print(f"\n [on_turn_error] unhandled error: {error}", file=sys.stderr)
     traceback.print_exc()
-
     # Send a message to the user
     await context.send_activity("The bot encountered an error or bug.")
 
