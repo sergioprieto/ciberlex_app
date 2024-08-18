@@ -6,6 +6,7 @@ from azure.identity import ManagedIdentityCredential
 import sys
 import traceback
 import os
+import json
 
 # Initialize the Managed Identity credential
 credential = ManagedIdentityCredential(client_id=os.getenv("MicrosoftAppId"))
@@ -39,22 +40,34 @@ app = FastAPI()
 
 @app.post("/api/messages")
 async def messages(request: Request):
-    if request.headers.get("Content-Type") == "application/json":
+    # Check for JSON content type
+    if "application/json" in request.headers.get("Content-Type", ""):
         body = await request.json()
+    # Check for URL-encoded content type
+    elif "application/x-www-form-urlencoded" in request.headers.get("Content-Type", ""):
+        form_data = await request.form()
+        body = json.loads(form_data.get("activity"))
     else:
-        return Response(status_code=415)
+        return Response(content="Unsupported Media Type", status_code=415)
 
-    activity = Activity().deserialize(body)
+    # Deserialize the activity
+    try:
+        activity = Activity().deserialize(body)
+    except Exception as e:
+        print(f"Error deserializing activity: {e}")
+        return Response(content="Invalid activity format", status_code=400)
+
     auth_header = request.headers.get("Authorization", "")
 
     try:
         response = await adapter.process_activity(activity, auth_header, bot.on_turn)
         if response:
             return Response(content=response.body, status_code=response.status)
-        return Response(status_code=201)
+        return Response(status_code=200)
     except Exception as e:
         print(f"Error processing activity: {e}")
-        return Response(status_code=500)
+        traceback.print_exc()
+        return Response(content="Internal Server Error", status_code=500)
 
 if __name__ == "__main__":
     import uvicorn
