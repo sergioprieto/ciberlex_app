@@ -2,19 +2,15 @@ from fastapi import FastAPI, Request, Response
 from botbuilder.core import BotFrameworkAdapterSettings, BotFrameworkAdapter
 from botbuilder.schema import Activity
 from teams_bot import TeamsRAGBot
-from azure.identity import ManagedIdentityCredential
 import sys
 import traceback
+from dotenv import load_dotenv
 import os
 
-# Initialize the Managed Identity credential
-credential = ManagedIdentityCredential(client_id=os.getenv("AZURE_CLIENT_ID"))
+load_dotenv()
 
-# Create adapter using Managed Identity
-settings = BotFrameworkAdapterSettings(
-    credential=credential,
-    tenant_id=os.getenv("AZURE_TENANT_ID"),
-)
+# Create adapter.
+settings = BotFrameworkAdapterSettings(os.getenv("MicrosoftAppId", ""), os.getenv("MicrosoftAppPassword", ""))
 adapter = BotFrameworkAdapter(settings)
 
 # Catch-all for errors.
